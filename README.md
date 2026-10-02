@@ -250,7 +250,7 @@ Alongside these, a **5-skill internal / mobile / AI red-team extension** covers 
 
 **Navigation:** [`.claude/skills/SECURITY_SKILLS_README.md`](.claude/skills/SECURITY_SKILLS_README.md) is the library entry point — full inventory with tier / profile / output-artifact per skill and the cross-skill dispatch map.
 
-**Validation:** `./scripts/validate-skills.sh` enforces structural correctness — name matches directory, required frontmatter fields, required body sections (Goal / When to Use / When NOT to Use / Authorization Check / Methodology / Output Format / Quality Check), forbidden-tool catch (sqlmap / metasploit / hydra / nikto), and `cloud-readonly` write-verb catch. Expected output: **0 errors, 0 warnings**. It skips the framework and architecture skills, which follow a different template.
+**Validation:** `./scripts/validate-skills.sh` enforces structural correctness — name matches directory, required frontmatter fields, required body sections (Goal / When to Use / When NOT to Use / Authorization Check / Methodology / Output Format / Quality Check), forbidden-tool catch (sqlmap / metasploit / hydra / nikto), and `cloud-readonly` write-verb catch. Expected output: **0 errors, 0 warnings**. It skips the framework, architecture, and security-knowledge skills, which follow a different template.
 
 ---
 
@@ -267,6 +267,24 @@ Alongside these, a **5-skill internal / mobile / AI red-team extension** covers 
 | Practice & communication | `facilitative-adr-and-governance`, `sociotechnical-iceberg-analysis`, `executive-elevator-translation` | Architecture Advice Process and ADRs; systems-thinking Iceberg diagnosis of chronic incidents; translating technical decisions into C-level business value |
 
 Invoke one explicitly with `/<skill-name>`, or let Claude Code auto-activate it when your request matches. Only the frontmatter (~100 tokens) is loaded per session; the full body (~2K tokens) loads on match.
+
+---
+
+## Security Knowledge Skills
+
+19 advisory security skills live under `.claude/skills/{name}/SKILL.md`, distilled from a 20-book O'Reilly security catalog (Defensive Security Handbook, Zero Trust Networks, Cloud Native Security Cookbook, Software Supply Chain Security, Identity Security for Software Development, The Developer's Playbook for LLM Security, Web Application Security, and more). Unlike the offensive / DFIR hunters, these are **defensive, architecture, and governance** aids that help you design, assess, build, and review. They are NOT composed by `security-orchestrator`, do not write to `SECURITY_AUDIT.md`, and are not bound by the offensive authorization contract; where one advises on active testing it defers execution to the matching hunter and to `.claude/security-scope.yaml`. Each ships with the same `## Goal / When to Use / When NOT to Use / Authorization Check / Methodology / Output Format / Quality Check / Common Issues` template, Opus for the heavier reasoning skills and Sonnet for the mechanical ones.
+
+| Theme | Skills | What it gives you |
+|---|---|---|
+| Blue team & operations | `defensive-security-foundations`, `blue-team-operations`, `security-ops-bash` | Build/mature a blue team program; hands-on PICERL incident triage; CLI log collection, baselining and automation |
+| Security governance | `cyber-risk-management-program`, `security-program-management` | Enterprise cyber-risk program (governance, assessment, FAIR, disclosure); standing up and running the InfoSec function |
+| Security architecture | `zero-trust-architecture`, `hybrid-cloud-security-architecture` | Control/data-plane zero trust with per-request authorization; zero-trust-based hybrid/multi-cloud architecture with ADRs |
+| Cloud security | `cloud-security-foundations`, `cloud-native-security`, `serverless-security`, `kubernetes-security-observability` | Shared-responsibility cloud programs; cross-provider landing zones and policy-as-code guardrails; FaaS hardening; holistic K8s security + observability |
+| DevSecOps | `security-as-code`, `continuous-security-devsecops`, `software-supply-chain-security` | Policy-as-code gates across IaC/CI/CD; an AI-augmented Continuous Security operating model; SBOMs and build provenance (SLSA, in-toto, Sigstore) |
+| Identity & AI | `identity-security-for-developers`, `llm-application-security`, `llm-privacy-protection` | AuthN/AuthZ and machine identity without long-lived secrets; build-time LLM app defense (RAISE); training-data privacy (DP, PEFT, federated learning) |
+| AppSec & threat intel | `web-application-security-defense`, `threat-intelligence-fundamentals` | Secure-by-default web app design and review; defensible nation-state/APT threat assessments and resilience guidance |
+
+Full inventory with per-skill source book: [`.claude/skills/SECURITY_KNOWLEDGE_SKILLS_README.md`](.claude/skills/SECURITY_KNOWLEDGE_SKILLS_README.md). Invoke one explicitly with `/<skill-name>`, or let Claude Code auto-activate it on a matching request.
 
 ---
 
@@ -762,8 +780,10 @@ your-project/
 │   │   │   ├── references/          # CSS patterns, libraries, slide patterns (~120KB)
 │   │   │   ├── templates/           # HTML reference templates (architecture, table, mermaid, slides)
 │   │   │   └── scripts/share.sh    # Vercel deployment script
-│   │   └── {ddd-context-mapping, distributed-sagas-and-workflows, ...}/
-│   │       └── SKILL.md            # 12 architecture & design skills (O'Reilly catalog)
+│   │   ├── {ddd-context-mapping, distributed-sagas-and-workflows, ...}/
+│   │   │   └── SKILL.md            # 12 architecture & design skills (O'Reilly catalog)
+│   │   └── {defensive-security-foundations, zero-trust-architecture, ...}/
+│   │       └── SKILL.md            # 19 security knowledge skills (O'Reilly catalog)
 │   ├── LEARNINGS.md                  # Full retro learnings archive (on-demand, not always loaded)
 │   ├── QUICK_REFERENCE.md           # Tool cheat sheets — terraform, docker, kubectl, ansible (on-demand)
 │   ├── scripts/
