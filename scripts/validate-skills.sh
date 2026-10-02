@@ -14,7 +14,12 @@ WARNINGS=0
 # that predate the security-skill batch — they use a different template).
 # The architecture & design skills (O'Reilly catalog) also use a different
 # template and are validated separately, so they are excluded here too.
-EXCLUDE_RE='^(_shared|implementing-code|planning-solutions|reviewing-code|review-fix|researching-code|visual-explainer|offensive-security|redteam-ad-ops|incident-response|redteam-ops|architectural-fitness-functions|contract-first-api-evolution|ddd-context-mapping|distributed-sagas-and-workflows|executive-elevator-translation|facilitative-adr-and-governance|green-ops-sustainability|medallion-lakehouse-pipelines|python-architecture-patterns|saas-multi-tenant-isolation|semantic-domain-deconstruction|sociotechnical-iceberg-analysis)$'
+# The security knowledge skills (O'Reilly security catalog: blue-team,
+# governance, cloud, devsecops, identity, AI, appsec, threat-intel) also use
+# the different template (Goal/Methodology/... with a metadata.source book
+# citation, no allowed-tools or scope-file binding) and are indexed in
+# SECURITY_KNOWLEDGE_SKILLS_README.md, so they are excluded here too.
+EXCLUDE_RE='^(_shared|implementing-code|planning-solutions|reviewing-code|review-fix|researching-code|visual-explainer|offensive-security|redteam-ad-ops|incident-response|redteam-ops|architectural-fitness-functions|contract-first-api-evolution|ddd-context-mapping|distributed-sagas-and-workflows|executive-elevator-translation|facilitative-adr-and-governance|green-ops-sustainability|medallion-lakehouse-pipelines|python-architecture-patterns|saas-multi-tenant-isolation|semantic-domain-deconstruction|sociotechnical-iceberg-analysis|defensive-security-foundations|blue-team-operations|security-ops-bash|cyber-risk-management-program|security-program-management|zero-trust-architecture|hybrid-cloud-security-architecture|cloud-security-foundations|cloud-native-security|serverless-security|kubernetes-security-observability|security-as-code|continuous-security-devsecops|software-supply-chain-security|identity-security-for-developers|llm-application-security|llm-privacy-protection|web-application-security-defense|threat-intelligence-fundamentals)$'
 # bash 3.2-compatible array fill (macOS ships bash 3.2; `mapfile` is 4+)
 SKILLS=()
 while IFS= read -r _skill_name; do
