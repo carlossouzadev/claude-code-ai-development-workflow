@@ -7,7 +7,7 @@
 <!--
   Slide deck: overview of the AI-Powered Software Development Lifecycle.
   Theme: Blueprint Teal — DM Sans + Fira Code, teal/amber accents on dark slate.
-  18 slides covering: problem, predictable AI, pipeline, security, tools, integrations, visualization, retrieval, hierarchical context, quick start.
+  slides covering: problem, predictable AI, pipeline, delivery layers, security, tools, integrations, visualization, retrieval, hierarchical context, quick start.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -642,7 +642,7 @@
     </div>
     <h1 class="slide__display reveal">AI-Powered SDLC</h1>
     <div class="reveal">
-      <p class="slide__subtitle" style="margin-top:clamp(16px,2vh,32px);">DevSecOps Edition &mdash; 11 Phases, 50+ Commands, 7 Integrated Tools</p>
+      <p class="slide__subtitle" style="margin-top:clamp(16px,2vh,32px);">DevSecOps Edition &mdash; 11 Phases, 50+ Commands, 11 Integrated Tools</p>
     </div>
   </section>
 
@@ -771,6 +771,34 @@ flowchart LR
   class DP,O,RT ops
       </pre>
     </div>
+    <p class="reveal" style="color:var(--text-dim);text-align:center;margin-top:10px;font-size:clamp(12px,1.3vw,15px);">Grouped by lifecycle flow (Define · Build · Secure · Ship). The next slide shows the same 11 phases grouped by purpose — the four Delivery Layers.</p>
+  </section>
+
+  <!-- SLIDE 5b: CONTENT — DELIVERY LAYERS -->
+  <section class="slide slide--content" style="background-image:radial-gradient(ellipse at 25% 30%, var(--accent-dim) 0%, transparent 45%);">
+    <div class="slide__inner" style="display:block;">
+      <p class="slide__label reveal">A Lens Over the 11 Phases</p>
+      <h2 class="slide__heading reveal">Four Delivery Layers</h2>
+      <p class="reveal" style="color:var(--text-dim);max-width:60ch;margin-top:8px;">The same 11 phases, read as four layers — what to build, proving it, running it, and the context that powers it.</p>
+      <div class="icon-grid reveal" style="grid-template-columns:repeat(2,1fr);gap:14px;margin-top:clamp(12px,2vh,24px);">
+        <div class="icon-card">
+          <div class="icon-card__title">① Spec</div>
+          <div class="icon-card__desc">Decide what to build, to what bar. <code>/roadmap</code> → <code>/discover</code> → <code>/research</code> → <code>/design</code> → <code>/plan</code>, plus the <strong>Quality Contract</strong> (cognitive complexity ≤12/15/25, ≥90% coverage, BDD, MVVM / Hexagonal).</div>
+        </div>
+        <div class="icon-card">
+          <div class="icon-card__title">② Verifier</div>
+          <div class="icon-card__desc">Prove it works and is safe. <code>/review</code> · <code>/security</code> (+ harden) · CI · <code>/deploy-plan</code> · the <code>verify</code> skill · QA / SRE / security review agents.</div>
+        </div>
+        <div class="icon-card">
+          <div class="icon-card__title">③ Loop</div>
+          <div class="icon-card__desc">Execute autonomously, bounded. <code>sdlc-orchestrator</code> (one issue, end-to-end) and <code>/roadmap-run</code> (one roadmap phase, one bounded slice per call — 3 hard stops, confirmation-gated).</div>
+        </div>
+        <div class="icon-card">
+          <div class="icon-card__title">④ Environment</div>
+          <div class="icon-card__desc">Context &amp; tools for the agent. <code>CLAUDE.md</code> · skills · semantic retrieval · memory · MCP integrations (MarkItDown, Firecrawl, claude-context, …).</div>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- SLIDE 6: DASHBOARD — KEY METRICS -->
@@ -783,19 +811,19 @@ flowchart LR
         <div class="slide__kpi-trend" style="color:var(--text-dim);">discovery to retro</div>
       </div>
       <div class="slide__kpi reveal">
-        <div class="slide__kpi-val" style="color:var(--accent2);">50+</div>
+        <div class="slide__kpi-val" style="color:var(--accent2);">60+</div>
         <div class="slide__kpi-label">Slash Commands</div>
-        <div class="slide__kpi-trend" style="color:var(--text-dim);">workflow + experts + quality</div>
+        <div class="slide__kpi-trend" style="color:var(--text-dim);">workflow + experts + quality + cloud cost</div>
       </div>
       <div class="slide__kpi reveal">
-        <div class="slide__kpi-val" style="color:var(--green);">7</div>
+        <div class="slide__kpi-val" style="color:var(--green);">77</div>
         <div class="slide__kpi-label">Skills</div>
-        <div class="slide__kpi-trend" style="color:var(--text-dim);">research, plan, code, review...</div>
+        <div class="slide__kpi-trend" style="color:var(--text-dim);">7 SDLC + 39 defensive security + 12 architecture + 19 security knowledge</div>
       </div>
       <div class="slide__kpi reveal">
-        <div class="slide__kpi-val" style="color:var(--blue);">8</div>
+        <div class="slide__kpi-val" style="color:var(--blue);">11</div>
         <div class="slide__kpi-label">Integrated Tools</div>
-        <div class="slide__kpi-trend" style="color:var(--text-dim);">Shannon, n8n, Firecrawl, claude-context...</div>
+        <div class="slide__kpi-trend" style="color:var(--text-dim);">Shannon, n8n, Firecrawl, claude-context, MarkItDown, aws-doctor, cloud-cost-cli...</div>
       </div>
       <div class="slide__kpi reveal">
         <div class="slide__kpi-val" style="color:var(--accent);">~50%</div>
@@ -831,7 +859,7 @@ flowchart LR
         <p class="slide__label reveal" style="color:var(--green);">This Workflow</p>
         <h2 class="slide__heading reveal" style="font-size:clamp(22px,3.5vw,36px);">4-Phase DevSecOps</h2>
         <ul class="slide__bullets" style="margin-top:16px;">
-          <li class="reveal"><strong style="color:var(--accent);">7a.</strong> OWASP + STRIDE static audit</li>
+          <li class="reveal"><strong style="color:var(--accent);">7a.</strong> OWASP/STRIDE + 39-skill orchestrated deep-dive</li>
           <li class="reveal"><strong style="color:var(--accent);">7b.</strong> Shannon autonomous pentest</li>
           <li class="reveal"><strong style="color:var(--accent);">7c.</strong> AI red team (OBLITERATUS)</li>
           <li class="reveal"><strong style="color:var(--accent);">8.</strong> Prioritized fix + re-verify</li>
@@ -924,9 +952,24 @@ flowchart LR
               <td><code>/firecrawl</code>, <code>/firecrawl/setup</code></td>
             </tr>
             <tr>
+              <td><strong>MarkItDown</strong></td>
+              <td>Document &rarr; Markdown (PDF, DOCX, PPTX, XLSX, EPub) &mdash; saves tokens vs. rendering PDFs as images; auto-converts on read</td>
+              <td><code>/markitdown</code>, <code>/markitdown/setup</code></td>
+            </tr>
+            <tr>
               <td><strong>claude-context</strong></td>
               <td>Semantic code retrieval &mdash; hybrid BM25 + vector search over AST-indexed codebases</td>
               <td><code>/retrieval</code>, <code>/retrieval/setup</code></td>
+            </tr>
+            <tr>
+              <td><strong>aws-doctor</strong></td>
+              <td>AWS cost diagnostics &mdash; idle resource detection, 6-month trend charts, region-aware pricing</td>
+              <td><code>/cloud/aws-doctor-setup</code>, <code>/cloud/aws-cost-estimate</code>, <code>/cloud/aws-waste-scan</code>, <code>/cloud/aws-trend</code></td>
+            </tr>
+            <tr>
+              <td><strong>cloud-cost-cli</strong></td>
+              <td>Multi-cloud cost analysis &mdash; AWS / Azure / GCP, 38 analyzers, confidence-labeled findings</td>
+              <td><code>/cloud/cost-cli-setup</code>, <code>/cloud/cost-scan</code>, <code>/cloud/aws-cost-compare</code></td>
             </tr>
           </tbody>
         </table>
@@ -1033,6 +1076,47 @@ flowchart LR
     </div>
   </section>
 
+  <!-- SLIDE 12b: SPLIT — MARKITDOWN DOCUMENT CONVERSION -->
+  <section class="slide slide--split">
+    <div class="slide__panels">
+      <div class="slide__panel slide__panel--primary">
+        <p class="slide__label reveal" style="color:var(--accent);">Document Conversion</p>
+        <h2 class="slide__heading reveal" style="font-size:clamp(22px,3.5vw,36px);">MarkItDown Integration</h2>
+        <ul class="slide__bullets" style="margin-top:16px;">
+          <li class="reveal">Converts <strong>PDF, DOCX, PPTX, XLSX, EPub</strong> &rarr; clean Markdown</li>
+          <li class="reveal"><strong>Saves tokens</strong> &mdash; <code style="font-family:var(--font-mono);font-size:0.85em;background:var(--accent-dim);color:var(--accent);padding:1px 5px;border-radius:3px;">Read</code> renders PDFs as images; Markdown is ~an order of magnitude cheaper</li>
+          <li class="reveal"><strong>Auto-converts on read</strong> &mdash; a user-level <code style="font-family:var(--font-mono);font-size:0.85em;background:var(--accent-dim);color:var(--accent);padding:1px 5px;border-radius:3px;">PreToolUse</code> hook intercepts document reads in every project</li>
+          <li class="reveal">Phase hooks in <code style="font-family:var(--font-mono);font-size:0.85em;background:var(--accent-dim);color:var(--accent);padding:1px 5px;border-radius:3px;">/discover</code> &amp; <code style="font-family:var(--font-mono);font-size:0.85em;background:var(--accent-dim);color:var(--accent);padding:1px 5px;border-radius:3px;">/research</code> convert before reading</li>
+          <li class="reveal">Local-first STDIO server (direct install, not Docker) &mdash; reads local <code style="font-family:var(--font-mono);font-size:0.85em;background:var(--accent-dim);color:var(--accent);padding:1px 5px;border-radius:3px;">file:</code> paths directly</li>
+        </ul>
+      </div>
+      <div class="slide__panel slide__panel--secondary">
+        <p class="slide__label reveal" style="color:var(--accent2);">Setup &amp; Use</p>
+        <div style="margin-top:12px;">
+          <pre class="reveal" style="background:var(--code-bg);color:var(--code-text);padding:16px;border-radius:8px;font-family:var(--font-mono);font-size:clamp(11px,1.2vw,14px);line-height:1.6;overflow-x:auto;"><code><span style="color:var(--text-dim);"># One-time setup (offers the</span>
+<span style="color:var(--text-dim);"># auto-convert interceptor)</span>
+<span style="color:var(--accent);">/markitdown/setup</span>
+
+<span style="color:var(--text-dim);"># Convert a document</span>
+<span style="color:var(--accent);">/markitdown</span> convert ./spec.pdf
+
+<span style="color:var(--text-dim);"># Or just Read it &mdash; the hook</span>
+<span style="color:var(--text-dim);"># auto-converts to .converted.md</span></code></pre>
+          <div class="icon-grid reveal" style="grid-template-columns:1fr;gap:8px;margin-top:12px;">
+            <div class="icon-card">
+              <div class="icon-card__title">convert_to_markdown</div>
+              <div class="icon-card__desc">file:/http(s):/data: &rarr; Markdown</div>
+            </div>
+            <div class="icon-card">
+              <div class="icon-card__title">PreToolUse interceptor</div>
+              <div class="icon-card__desc">Auto-converts docs on read, cached &amp; size-guarded</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- SLIDE 13: SPLIT — SEMANTIC CODE RETRIEVAL -->
   <section class="slide slide--split">
     <div class="slide__panels">
@@ -1098,6 +1182,44 @@ flowchart LR
         </div>
         <div class="reveal" style="margin-top:16px;padding:12px;background:var(--accent-dim);border-radius:8px;border-left:3px solid var(--accent);">
           <div style="font-family:var(--font-mono);font-size:clamp(11px,1.2vw,13px);color:var(--text-dim);">Zero external deps &mdash; all prompt-based (Glob + Grep). Cross-session cache via 01_DISCOVERY.md; intra-session via context window.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 14b: SPLIT — CLOUD COST OPTIMIZATION -->
+  <section class="slide slide--split">
+    <div class="slide__panels">
+      <div class="slide__panel slide__panel--primary">
+        <p class="slide__label reveal" style="color:var(--accent);">FinOps Layer</p>
+        <h2 class="slide__heading reveal" style="font-size:clamp(22px,3.5vw,36px);">Cloud Cost Optimization</h2>
+        <ul class="slide__bullets" style="margin-top:16px;">
+          <li class="reveal">Two tools, one workflow &mdash; <strong>aws-doctor</strong> (Go, AWS-only, region-aware pricing) + <strong>cloud-cost-cli</strong> (Node, AWS / Azure / GCP, 38 analyzers)</li>
+          <li class="reveal"><strong>Issue-tied by default</strong> &mdash; cost artifacts land in <code style="font-family:var(--font-mono);font-size:0.85em;background:var(--accent-dim);color:var(--accent);padding:1px 5px;border-radius:3px;">.claude/planning/{issue}/</code> next to research, design, security</li>
+          <li class="reveal"><code style="font-family:var(--font-mono);font-size:0.85em;background:var(--accent-dim);color:var(--accent);padding:1px 5px;border-radius:3px;">aws-cost-compare</code> runs both tools and diffs &mdash; <strong>Consensus</strong> findings act as a high-confidence prioritization signal</li>
+          <li class="reveal"><code style="font-family:var(--font-mono);font-size:0.85em;background:var(--accent-dim);color:var(--accent);padding:1px 5px;border-radius:3px;">/discover</code> auto-suggests the right setup per detected cloud; <code style="font-family:var(--font-mono);font-size:0.85em;background:var(--accent-dim);color:var(--accent);padding:1px 5px;border-radius:3px;">/deploy-plan</code> gates cloud-provisioning deploys on a cost baseline</li>
+          <li class="reveal">Cost-Material flag triggers when projected delta &gt; 10% of account spend or any Consensus finding &gt; $500/mo</li>
+        </ul>
+      </div>
+      <div class="slide__panel slide__panel--secondary">
+        <p class="slide__label reveal" style="color:var(--accent2);">Setup &amp; Use</p>
+        <div style="margin-top:12px;">
+          <pre class="reveal" style="background:var(--code-bg);color:var(--code-text);padding:16px;border-radius:8px;font-family:var(--font-mono);font-size:clamp(11px,1.2vw,14px);line-height:1.6;overflow-x:auto;"><code><span style="color:var(--text-dim);"># One-time setup (per tool)</span>
+<span style="color:var(--accent);">/cloud/aws-doctor-setup</span>
+<span style="color:var(--accent);">/cloud/cost-cli-setup</span>
+
+<span style="color:var(--text-dim);"># AWS &mdash; baseline cost for a change</span>
+<span style="color:var(--accent);">/cloud/aws-cost-estimate</span> migrate-ecs-app
+
+<span style="color:var(--text-dim);"># AWS &mdash; run both tools, diff results</span>
+<span style="color:var(--accent);">/cloud/aws-cost-compare</span> migrate-ecs-app
+
+<span style="color:var(--text-dim);"># Azure / GCP &mdash; multi-cloud scan</span>
+<span style="color:var(--accent);">/cloud/cost-scan</span> migrate-app --provider azure
+<span style="color:var(--accent);">/cloud/cost-scan</span> migrate-app --provider gcp
+
+<span style="color:var(--text-dim);"># Ad-hoc account-wide sweep</span>
+<span style="color:var(--accent);">/cloud/aws-waste-scan</span></code></pre>
         </div>
       </div>
     </div>

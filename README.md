@@ -16,6 +16,7 @@ This project synthesizes and extends several open-source tools, each bringing di
 | [**n8n-MCP**](https://github.com/czlonkowski/n8n-mcp) by czlonkowski | MCP server bridging n8n workflow automation with Claude Code — access 1,084+ nodes, 2,709 templates, and optionally manage a live n8n instance (CRUD workflows, trigger executions). Self-hosted or hosted | `/n8n`, `/n8n/setup` |
 | [**Firecrawl**](https://github.com/firecrawl/firecrawl) by firecrawl | Web scraping, crawling, and structured data extraction via MCP. Fallback when built-in `WebFetch` fails on JS-rendered or anti-bot protected pages. Self-hosted (Docker) or cloud API | `/firecrawl`, `/firecrawl/setup` |
 | [**claude-context**](https://github.com/zilliztech/claude-context) by Zilliz | Semantic code retrieval via MCP — hybrid BM25 + vector search over AST-indexed codebases. Tree-sitter parsing, Merkle tree incremental indexing, multiple embedding providers (Ollama, OpenAI, Voyage, Gemini). Enhances `/research` and `/implement` with semantic search | `/retrieval`, `/retrieval/setup` |
+| [**MarkItDown**](https://github.com/microsoft/markitdown) by Microsoft | Converts non-plaintext documents (PDF, Office, images, audio, HTML, EPub, ZIP) to clean Markdown via MCP. Saves tokens versus `Read` rendering PDF pages as images. Local-first STDIO server; `/discover` and `/research` convert documents automatically before reading | `/markitdown`, `/markitdown/setup` |
 
 Extended with: Discovery, Architecture/ADR, DevSecOps security layer, Deployment, Observability, Retrospective phases, performance testing, hotfix workflow, multi-agent orchestration, and self-improving CLAUDE.md via automated retrospectives.
 
@@ -63,6 +64,19 @@ cp -r .claude/ /path/to/your/project/.claude/
 ```
 
 ---
+
+## Delivery Layers
+
+The 11 phases read as four layers — a lens for *why* each capability exists:
+
+| Layer | Purpose | Where |
+|-------|---------|-------|
+| **① Spec** | What to build, to what bar | `/roadmap` → `/discover` → `/research` → `/design-system` → `/plan` + the **Quality Contract** (cognitive-complexity tiers, ≥90% coverage, BDD, MVVM/Hexagonal) |
+| **② Verifier** | Prove it works & is safe | `/review` · `/security` · CI · `/deploy-plan` · `verify` · review agents |
+| **③ Loop** | Execute autonomously, bounded | `sdlc-orchestrator` (per issue) · `/roadmap-run` (per roadmap phase, one bounded slice at a time) |
+| **④ Environment** | Context & tools | `CLAUDE.md` · skills · semantic retrieval · memory · MCP integrations |
+
+Full phase→layer map and the Quality Contract rationale: [`.claude/ARCHITECTURE.md`](.claude/ARCHITECTURE.md) → Delivery Layers.
 
 ## The DevSecOps Workflow
 
@@ -115,7 +129,7 @@ cp -r .claude/ /path/to/your/project/.claude/
 | 3 | **Design** | `/design-system {issue}` | `03_ARCHITECTURE.md`, `03_ADR-*.md`, `03_PROJECT_SPEC.md` |
 | 4 | **Plan** | `/plan {issue}` | `04_IMPLEMENTATION_PLAN.md`, test strategy |
 | 5 | **Implement** | `/implement {issue}` | Source code, tests, updated `00_STATUS.md` |
-| 6 | **Review** | `/review {issue}` | `06_CODE_REVIEW.md`, approval/rejection status |
+| 6 | **Review** | `/review {issue}` | `06_CODE_REVIEW.md`, approval/rejection status (parallel specialist agents: architect, qa, sre, security, tech-writer) |
 | 7a | **Static Security** | `/security {issue}` | `07a_SECURITY_AUDIT.md` (OWASP, STRIDE, deps) |
 | 7b | **Dynamic Pentest** | `/security/pentest {issue}` | `07b_PENTEST_REPORT.md` (Shannon-confirmed exploits) |
 | 7c | **AI Model Audit** | `/security/redteam-ai {issue}` | `07c_AI_THREAT_MODEL.md` (only if LLMs in stack) |
@@ -130,6 +144,7 @@ cp -r .claude/ /path/to/your/project/.claude/
 
 | Command | Phase | What It Does |
 |---------|-------|--------------|
+| `/security {issue}` | 7a | Static audit — runs OWASP/STRIDE checklist for small scopes, or delegates to `@security-orchestrator` (which composes 40 defensive skills) for large / high-risk scopes |
 | `/security/pentest {issue}` | 7b | Dynamic pentest via Shannon — only reports proven exploits with PoCs |
 | `/security/redteam-ai {issue}` | 7c | AI/LLM threat modeling — prompt injection surface, OBLITERATUS analysis |
 | `/security/harden {issue}` | 8 | Prioritized fix plan (P0–P3), implements P0 patches, creates GitHub issues |
@@ -153,11 +168,27 @@ docker --version
 # 3. Authenticate with Claude Code (only needed once)
 claude login
 
-# That's it. The MCP wrapper handles everything else automatically.
+# 4. Register the Shannon MCP server (use absolute paths — Claude Code does
+#    NOT expand ${HOME}, ~, or ${workspaceFolder} in mcpServers entries).
+claude mcp add-json --scope project shannon "$(cat <<JSON
+{
+  "type": "stdio",
+  "command": "bash",
+  "args": ["$(pwd)/.claude/scripts/shannon-mcp-wrapper.sh"],
+  "env": {
+    "SHANNON_DIR": "$(pwd)/shannon",
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000"
+  }
+}
+JSON
+)"
+
+# 5. Verify it connected
+claude mcp list | grep shannon
 ```
 
 **How it works:**
-- `.claude/scripts/shannon-mcp-wrapper.sh` reads `~/.claude/credentials.json` at startup
+- `.claude/scripts/shannon-mcp-wrapper.sh` reads the Claude Code OAuth token at startup — from the macOS Keychain (`security find-generic-password -s "Claude Code-credentials"`) on macOS, falling back to `~/.claude/credentials.json` on Linux
 - Extracts OAuth token, builds Shannon's MCP server if needed, launches it
 - When token rotates, just `claude login` — next call picks it up automatically
 
@@ -168,6 +199,117 @@ claude login
 Relevant **only** when your app embeds a self-hosted open-source LLM (Llama, Mistral, etc.). For cloud APIs (Claude, GPT), skip this and use the prompt injection patterns from `/security/redteam-ai` instead.
 
 OBLITERATUS requires a GPU. See the [OBLITERATUS repo](https://github.com/elder-plinius/OBLITERATUS) for installation.
+
+### Defensive Security Skills Library
+
+40 specialist defensive-testing skills live under `.claude/skills/{name}/SKILL.md`, grouped by tier and class. A `security-orchestrator` agent composes them based on target type (web app / API / cloud / CI-CD), scope risk, and detected stack. The library is the backbone of `/security` Phase 7a for anything larger than an M-sized feature.
+
+Alongside these, a **5-skill internal / mobile / AI red-team extension** covers categories the web/API/cloud hunters do not (Active Directory, Android, LLM endpoints). These run on a **separate, manually-driven track** — the orchestrator does not auto-dispatch them because their tooling and blast radius differ from the harmless-probe model. See the extension table below.
+
+**Coverage by class (skill counts in parentheses):**
+
+| Class | Skills | Notable |
+|---|---|---|
+| Recon (T4) | web-check-recon, web-recon-passive, web-recon-active, api-recon, auth-flow-mapper, attack-surface-mapper | Produce `WEBCHECK.md` / `PASSIVE_RECON.md` / `ATTACK_SURFACE.md` / `API_INVENTORY.md` / `AUTH_FLOWS.md` / `CONSOLIDATED_ATTACK_SURFACE.md` — consumed by every hunter. `web-check-recon` runs a self-hosted [web-check](https://github.com/lissy93/web-check) container on demand for a fast structured first-pass |
+| Authentication (T1) | auth-flaw, session-flaw, jwt, oauth-oidc | Full auth stack: enumeration, lockout, MFA-skip, JWT `alg:none` / HS256 crack / RS256→HS256, OAuth redirect-URI bypass |
+| Access control (T1) | idor, bola-bfla | Web-app IDOR + API BOLA/BFLA (OWASP API1:2023, API5:2023) |
+| Injection (T1–T2) | sqli, xxe, ssti, command-injection, path-traversal, deserialization | With post-RCE halt contract: stop at proof, never pivot |
+| Client-side (T1–T2) | xss, dom-xss, clickjacking, csrf, open-redirect, cors-misconfig | Context-aware payloads, filter-evasion catalog, CSP + SameSite audits |
+| API-class (T1–T2) | graphql, mass-assignment, excessive-data-exposure, rate-limit, owasp-api-top10-tester | `owasp-api-top10-tester` is a meta-skill producing `API_TOP10_COVERAGE.md` |
+| Server-side (T1–T2) | ssrf, ssrf-cloud-metadata, cache-smuggling | `cache-smuggling-hunter` is dual-gated (staging only, post-test cache-purge required) |
+| Logic + crypto | business-logic, crypto-flaw | Workflow bypasses + consolidated TLS/cookie/JWT/secret audit |
+| Cloud / CI-CD / Secrets (T3) | aws-iam, s3-misconfig, container, gitlab-cicd, secrets-in-code | READ-ONLY AWS CLI, trufflehog + gitleaks over repo history |
+| Recon-adjacent (T2) | subdomain-takeover | Dangling CNAMEs to unclaimed GitHub / S3 / Heroku / Azure |
+
+**Internal / Mobile / AI red-team extension (5 skills, separate track):**
+
+| Class | Skills | Notable |
+|---|---|---|
+| AD reference | redteam-ad-ops | Knowledge skill (no execution): network-service matrix, AD attack lifecycle, credential-access/OPSEC maps, C2/EDR-evasion. Grounds the AD hunters. Sourced from RedefiningReality/Cheatsheets (MIT). |
+| Internal AD (internal-ad) | ad-recon, ad-kerberos | BloodHound + LDAP enumeration → Kerberoast / AS-REP / delegation. New `internal-ad` profile deliberately permits credential attacks; extra-gated by `internal_pentest: approved` + sub-gates |
+| AI red-team (ai-redteam) | llm-redteam | Automated garak + PyRIT against first-party LLM endpoints → OWASP LLM Top 10. Complements the manual `/redteam-ai` command |
+| Mobile (mobile-sast) | mobile-android | Static APK assessment (MobSF + apkleaks) → OWASP MASVS. Cannibalized from guardian-cli (MIT) |
+
+**DFIR / Incident Response extension (4 skills, separate defensive track):** the stack's first non-offensive capability. Analyzes acquired evidence **copies read-only**; never acquires, mutates, contains, or eradicates. Writes to `INCIDENT_REPORT.md`. Authored from NIST SP 800-61/800-86, SANS PICERL, and MITRE ATT&CK/D3FEND.
+
+| Class | Skills | Notable |
+|---|---|---|
+| IR reference | incident-response | Knowledge skill (no execution): NIST/PICERL lifecycle, evidence handling + chain of custody, triage decision tree, IOC/ATT&CK model. Grounds the DFIR hunters. |
+| Forensics (dfir-readonly) | memory-forensics, disk-triage, log-timeline | Volatility 3 (RAM), Sleuth Kit + plaso (disk), Chainsaw/Hayabusa Sigma (EVTX/logs/PCAP). Hash-verified evidence, unified UTC timeline, ATT&CK-tagged findings. Gated by `dfir_scope.incident_response: approved` |
+
+**Red-team-ops extension (8 skills, full-scope offensive engagements):** for **proving impact to clients** beyond findings — network/infra pentest, post-exploitation, reverse engineering, exploit validation, social engineering, and wireless. More aggressive than the web `active` hunters; least-damage proof, no online brute force, no persistence. Authored from PTES / NIST SP 800-115 / HackTricks / GTFOBins (tool names cross-checked against awesome-pentest, CC-BY-4.0). **AV/EDR evasion intentionally excluded.**
+
+| Class | Skills | Notable |
+|---|---|---|
+| Engagement reference | redteam-ops | Knowledge skill (no execution): PTES phases, ROE + proof-for-clients, external→internal kill-chain, technique/tool map. Grounds the red-team-ops hunters. |
+| Infra + post-ex | network-pentest, host-privesc, cracking | Non-web infra pentest (nmap/netexec/searchsploit), local Linux/Windows privesc (PEAS/GTFOBins/LOLBAS), offline hash cracking (hashcat/John) |
+| RE + exploit | reverse-engineering, exploit-validation | Static+sandboxed RE (Ghidra/radare2/gdb/binwalk); confirm exploitability with vetted PoCs/pwntools (replica-first, benign proof) |
+| Human + RF | social-engineering, wireless | Phishing/awareness (Gophish; evilginx MFA-demo gated, separate consent); 802.11 survey + rogue-AP/awareness demos from a Linux capture host (VM passthrough / Raspberry Pi, never macOS). Gated by `red_team_ops.*` |
+
+**Authorization model.** Every skill reads `.claude/security-scope.yaml` before any outbound activity and halts if the file is missing, malformed, or contains only placeholder assets. The scope file is distributed as a template — it **must** be populated with real company-owned targets before live use. See the "Security Testing Scope and Authorization" section of `CLAUDE.md` for the full rules-of-engagement contract.
+
+**Navigation:** [`.claude/skills/SECURITY_SKILLS_README.md`](.claude/skills/SECURITY_SKILLS_README.md) is the library entry point — full inventory with tier / profile / output-artifact per skill and the cross-skill dispatch map.
+
+**Validation:** `./scripts/validate-skills.sh` enforces structural correctness — name matches directory, required frontmatter fields, required body sections (Goal / When to Use / When NOT to Use / Authorization Check / Methodology / Output Format / Quality Check), forbidden-tool catch (sqlmap / metasploit / hydra / nikto), and `cloud-readonly` write-verb catch. Expected output: **0 errors, 0 warnings**. It skips the framework, architecture, and security-knowledge skills, which follow a different template.
+
+---
+
+## Architecture & Design Skills
+
+12 architecture skills live under `.claude/skills/{name}/SKILL.md`, distilled from the O'Reilly software-architecture catalog (Building Microservices, Software Architecture: The Hard Parts, Learning DDD, Building Evolutionary Architectures, The Software Architect Elevator, and more). They complement the SDLC phases — reach for them during `/design-system` (Phase 3), `/plan` (Phase 4), and `/implement` (Phase 5) when a design decision needs a grounded methodology rather than improvisation. Each ships with `## Goal / When to Use / When NOT to Use / Methodology / Output Format / Quality Check`, and routes to Opus for the heavier reasoning skills, Sonnet for the mechanical ones.
+
+| Theme | Skills | What it gives you |
+|---|---|---|
+| Domain & modelling | `ddd-context-mapping`, `semantic-domain-deconstruction` | Bounded contexts, context maps and anticorruption layers; untangling rigid hierarchies, enums and coupled models |
+| Distributed systems | `distributed-sagas-and-workflows`, `contract-first-api-evolution` | Orchestrated / choreographed sagas with compensation; OpenAPI-first design with consumer-driven contracts to stop breaking changes |
+| Evolutionary architecture | `architectural-fitness-functions`, `python-architecture-patterns` | Turn architecture rules into automated CI test gates; refactor into Repository / Service Layer / Unit of Work (Onion / Hexagonal) |
+| Platform & data | `saas-multi-tenant-isolation`, `medallion-lakehouse-pipelines`, `green-ops-sustainability` | Tenant-isolation and noisy-neighbour audits; Bronze / Silver / Gold lakehouse layers; carbon-efficiency audit of code, Dockerfiles and cloud templates |
+| Practice & communication | `facilitative-adr-and-governance`, `sociotechnical-iceberg-analysis`, `executive-elevator-translation` | Architecture Advice Process and ADRs; systems-thinking Iceberg diagnosis of chronic incidents; translating technical decisions into C-level business value |
+
+Invoke one explicitly with `/<skill-name>`, or let Claude Code auto-activate it when your request matches. Only the frontmatter (~100 tokens) is loaded per session; the full body (~2K tokens) loads on match.
+
+---
+
+## Security Knowledge Skills
+
+19 advisory security skills live under `.claude/skills/{name}/SKILL.md`, distilled from a 20-book O'Reilly security catalog (Defensive Security Handbook, Zero Trust Networks, Cloud Native Security Cookbook, Software Supply Chain Security, Identity Security for Software Development, The Developer's Playbook for LLM Security, Web Application Security, and more). Unlike the offensive / DFIR hunters, these are **defensive, architecture, and governance** aids that help you design, assess, build, and review. They are NOT composed by `security-orchestrator`, do not write to `SECURITY_AUDIT.md`, and are not bound by the offensive authorization contract; where one advises on active testing it defers execution to the matching hunter and to `.claude/security-scope.yaml`. Each ships with the same `## Goal / When to Use / When NOT to Use / Authorization Check / Methodology / Output Format / Quality Check / Common Issues` template, Opus for the heavier reasoning skills and Sonnet for the mechanical ones.
+
+| Theme | Skills | What it gives you |
+|---|---|---|
+| Blue team & operations | `defensive-security-foundations`, `blue-team-operations`, `security-ops-bash` | Build/mature a blue team program; hands-on PICERL incident triage; CLI log collection, baselining and automation |
+| Security governance | `cyber-risk-management-program`, `security-program-management` | Enterprise cyber-risk program (governance, assessment, FAIR, disclosure); standing up and running the InfoSec function |
+| Security architecture | `zero-trust-architecture`, `hybrid-cloud-security-architecture` | Control/data-plane zero trust with per-request authorization; zero-trust-based hybrid/multi-cloud architecture with ADRs |
+| Cloud security | `cloud-security-foundations`, `cloud-native-security`, `serverless-security`, `kubernetes-security-observability` | Shared-responsibility cloud programs; cross-provider landing zones and policy-as-code guardrails; FaaS hardening; holistic K8s security + observability |
+| DevSecOps | `security-as-code`, `continuous-security-devsecops`, `software-supply-chain-security` | Policy-as-code gates across IaC/CI/CD; an AI-augmented Continuous Security operating model; SBOMs and build provenance (SLSA, in-toto, Sigstore) |
+| Identity & AI | `identity-security-for-developers`, `llm-application-security`, `llm-privacy-protection` | AuthN/AuthZ and machine identity without long-lived secrets; build-time LLM app defense (RAISE); training-data privacy (DP, PEFT, federated learning) |
+| AppSec & threat intel | `web-application-security-defense`, `threat-intelligence-fundamentals` | Secure-by-default web app design and review; defensible nation-state/APT threat assessments and resilience guidance |
+
+Full inventory with per-skill source book: [`.claude/skills/SECURITY_KNOWLEDGE_SKILLS_README.md`](.claude/skills/SECURITY_KNOWLEDGE_SKILLS_README.md). Invoke one explicitly with `/<skill-name>`, or let Claude Code auto-activate it on a matching request.
+
+---
+
+## Agent Library
+
+Agents live under `.claude/agents/` and split into two roles — **orchestrators** (drive a phase end-to-end) and **specialists** (focused domain experts dispatched by an orchestrator or invoked directly). The `/review` phase (Phase 6) dispatches five specialists in parallel, aggregates their verdicts, and runs a scoped fix loop (max 3 iterations — only failing specialists re-review). The `/security` phase (Phase 7a) delegates to `security-orchestrator` for large scopes, which composes the 40 defensive skills.
+
+**Orchestrators:**
+
+| Agent | Role |
+|---|---|
+| `sdlc-orchestrator` | Autonomous SDLC driver — Research → Plan → Implement → Review, with parallel specialist dispatch and JSON state machine |
+| `security-orchestrator` | Composes 40 defensive skills based on asset type, scope risk, and detected stack |
+
+**Specialists:**
+
+| Agent | Focus | Primary Phase |
+|---|---|---|
+| `architect` | Architecture fit, design patterns, coupling, contracts | Review (6) |
+| `qa-reviewer` | Test coverage, test quality, edge cases, regression risk | Review (6) |
+| `sre-reviewer` | Reliability, observability, failure modes, operational readiness | Review (6) |
+| `security-analyst` | OWASP / STRIDE, credential handling, input validation, Shannon / OBLITERATUS operation | Review (6) + Security (7a–8) |
+| `tech-writer` | Docs, changelog, API surface, breaking-change detection | Review (6) + Deploy (9) |
+
+Full pattern reference: [`.claude/sdlc/AGENTIC_WORKFLOW_BEST_PRACTICES.md`](.claude/sdlc/AGENTIC_WORKFLOW_BEST_PRACTICES.md) — parallel-dispatch contract, JSON state schema (v2.0.0), scoped-fix-loop semantics, risk-level extraction, and agent composition patterns.
 
 ## Bonus Commands
 
@@ -296,6 +438,46 @@ Enhance the `/research` and `/implement` phases with semantic code search powere
 
 # Check index status
 /retrieval status
+```
+
+## Document Conversion (MarkItDown)
+
+Convert non-plaintext documents to clean Markdown **before** the workflow reads them, using [MarkItDown](https://github.com/microsoft/markitdown) MCP. This saves tokens: Claude Code's built-in `Read` tool renders PDF pages **as images** (very high token cost, no extractable text), whereas MarkItDown returns plain Markdown — typically an order of magnitude cheaper, plus greppable and diffable (and a good candidate to feed into the semantic retrieval layer).
+
+**Why it matters:**
+
+| | Reading a PDF/DOCX/XLSX directly | With MarkItDown |
+|---|---|---|
+| **Token cost** | PDF pages rendered as images — very expensive | Plain Markdown text — ~an order of magnitude cheaper |
+| **Searchability** | Image content is not greppable | Output is text — greppable, diffable, indexable |
+| **Office docs** | DOCX/PPTX/XLSX not cleanly readable | Converted to structured Markdown |
+
+| Command | Purpose |
+|---------|---------|
+| `/markitdown/setup` | Interactive setup wizard — installs the converter (Python **3.10–3.13**; 3.14 not yet supported by deps) and **offers to install the auto-conversion interceptor** (asks first) |
+| `/markitdown [request]` | Convert a file or URL to Markdown (optionally save alongside the source) |
+
+> **Requires Python 3.10–3.13.** The wizard auto-selects a compatible interpreter. The interceptor can also be installed/re-installed directly: `bash .claude/scripts/install-markitdown-interceptor.sh` (idempotent).
+
+**How it works:**
+- **Tool**: `convert_to_markdown(uri)` accepts `file:`, `http(s):`, and `data:` URIs and returns Markdown text
+- **Supported**: PDF, Word, PowerPoint, Excel, images (OCR), audio (transcription), HTML, CSV/JSON/XML, EPub, ZIP, and more
+- **Local-first**: runs as a directly-installed STDIO server (not Docker) so it reads local `file:` paths without volume mounts
+- **Automatic (phase-level)**: `/discover` and `/research` convert non-plaintext documents to Markdown before reading them — plaintext and source files are read directly
+- **Automatic (harness-level interceptor)**: a `PreToolUse(Read)` hook (`~/.claude/hooks/markitdown-read.sh`, user-level so it applies in every project) intercepts when **Claude calls the `Read` tool** on a document (PDF/DOCX/PPTX/XLSX/EPub) — converts it to a sibling `.converted.md` and redirects the read there, *before* the binary is loaded (so no wasted tokens). Images/audio are left on normal `Read` (so visuals aren't lost); conversion is cached, size-guarded (skips >50 MB), and falls back to native `Read` on any error.
+  - **Known limitation:** this catches *model-initiated* reads, **not** files you drag-drop or paste as a bare path — Claude Code attaches those through an internal pipeline that bypasses the `Read` tool, and no hook can intercept it. For a dropped document, ask *"read /path/file.docx"* (routes through `Read`) or use `/markitdown convert <path>`.
+- **Graceful**: if not configured, the workflow falls back to native `Read` — nothing breaks
+
+```bash
+# First time: run the setup wizard
+/markitdown/setup
+
+# Convert a document (and save docs/requirements.md alongside it)
+/markitdown convert ./docs/requirements.pdf and save it
+
+# Convert a spreadsheet or a remote page
+/markitdown read ./data/metrics.xlsx
+/markitdown convert https://example.com/whitepaper
 ```
 
 ## Code Intelligence Layer
@@ -449,6 +631,29 @@ Run anytime — auto-detect your stack and apply appropriate tooling:
 
 ---
 
+## Cloud Cost Commands (AWS / Azure / GCP)
+
+Two underlying tools, used in tandem where useful:
+
+- [**aws-doctor**](https://github.com/elC0mpa/aws-doctor) (Go) — AWS-only, strong region-aware pricing, 6-month trend charts. Setup: `/cloud/aws-doctor-setup`.
+- [**cloud-cost-cli**](https://github.com/vuhp/cloud-cost-cli) (Node ≥20) — multi-cloud (AWS / Azure / GCP), 18 AWS / 11 Azure / 9 GCP analyzers with confidence labels. Setup: `/cloud/cost-cli-setup`.
+
+Issue-tied by default — output lands in the active planning directory and links from `00_STATUS.md`. Pass `--adhoc` (or omit the issue name) for one-off scans that write to `.claude/reports/` instead.
+
+| Command | Tool | Purpose |
+|---------|------|---------|
+| `/cloud/aws-doctor-setup` | aws-doctor | One-time install + IAM permission check |
+| `/cloud/cost-cli-setup` | cloud-cost-cli | One-time install + per-provider auth check (AWS/Azure/GCP) |
+| `/cloud/aws-cost-estimate {issue}` | aws-doctor | Cost baseline + projected monthly delta (`05c_COST_BASELINE.md`) |
+| `/cloud/aws-waste-scan [issue] [services...]` | aws-doctor | Rank idle / over-provisioned AWS resources, P0–P3 (`05d_AWS_WASTE.md`) |
+| `/cloud/aws-trend [issue] [services...]` | aws-doctor | 6-month per-service trend + runaway/creeping classification (`05e_AWS_TREND.md`) |
+| `/cloud/cost-scan [issue] --provider {aws\|azure\|gcp}` | cloud-cost-cli | Multi-cloud scan (`05f_CLOUD_COST.md`) |
+| `/cloud/aws-cost-compare [issue]` | both | Run both tools against AWS, diff consensus / unique / conflicting findings (`05g_AWS_COMPARE.md`) |
+
+`/discover` auto-suggests the relevant setup + scan command based on detected cloud (AWS / Azure / GCP). `/deploy-plan` requires the matching cost artifact before approving cloud-provisioning deploys.
+
+---
+
 ## File Organization
 
 ```
@@ -510,8 +715,16 @@ your-project/
 │   │   ├── retrieval.md               # Semantic code retrieval assistant
 │   │   ├── retrieval/
 │   │   │   └── setup.md              # claude-context MCP setup wizard
-│   │   └── devops/
-│   │       └── ci-pipeline.md       # CI/CD pipeline generation
+│   │   ├── devops/
+│   │   │   └── ci-pipeline.md       # CI/CD pipeline generation
+│   │   └── cloud/
+│   │       ├── aws-doctor-setup.md  # Install/verify aws-doctor CLI
+│   │       ├── aws-cost-estimate.md # Cost baseline + projected delta (aws-doctor)
+│   │       ├── aws-waste-scan.md    # Idle / over-provisioned resources (aws-doctor)
+│   │       ├── aws-trend.md         # 6-month per-service trend (aws-doctor)
+│   │       ├── cost-cli-setup.md    # Install/verify cloud-cost-cli (multi-cloud)
+│   │       ├── cost-scan.md         # Multi-cloud scan (aws/azure/gcp via cloud-cost-cli)
+│   │       └── aws-cost-compare.md  # Run both tools against AWS, diff findings
 │   ├── planning/                    # Auto-generated per issue
 │   │   └── {issue-name}/
 │   │       ├── 00_STATUS.md            # Central progress dashboard
@@ -531,7 +744,14 @@ your-project/
 │   │       └── 11_RETROSPECTIVE.md
 │   ├── agents/                      # Multi-agent orchestration
 │   │   ├── sdlc-orchestrator.md    # Autonomous SDLC agent (Research→Plan→Implement→Review)
+│   │   ├── architect.md            # Specialist reviewer — architecture & design
+│   │   ├── qa-reviewer.md          # Specialist reviewer — test coverage & quality
+│   │   ├── sre-reviewer.md         # Specialist reviewer — reliability & operations
+│   │   ├── tech-writer.md          # Specialist reviewer — docs, changelog, API surface
+│   │   ├── security-orchestrator.md # Composes 40 defensive skills (Phase 7a)
 │   │   └── security-analyst.md     # Security persona (OWASP, Shannon, OBLITERATUS)
+│   ├── sdlc/                        # SDLC reference docs
+│   │   └── AGENTIC_WORKFLOW_BEST_PRACTICES.md  # Parallel-review, scoped-fix-loop, JSON state patterns
 │   ├── skills/                      # Folder-based skills (Anthropic official format)
 │   │   ├── researching-code/
 │   │   │   └── SKILL.md            # Codebase research skill (model: opus)
@@ -545,16 +765,30 @@ your-project/
 │   │   │   └── SKILL.md            # Review fix skill (model: sonnet)
 │   │   ├── offensive-security/
 │   │   │   └── SKILL.md            # OWASP, STRIDE, exploit patterns reference (model: opus)
-│   │   └── visual-explainer/        # HTML visualization skill (visual-explainer)
-│   │       ├── SKILL.md            # Workflow, diagram types, anti-slop rules (model: sonnet)
-│   │       ├── references/          # CSS patterns, libraries, slide patterns (~120KB)
-│   │       ├── templates/           # HTML reference templates (architecture, table, mermaid, slides)
-│   │       └── scripts/share.sh    # Vercel deployment script
+│   │   ├── redteam-ad-ops/
+│   │   │   └── SKILL.md            # Internal/AD red-team reference: lifecycle, OPSEC, evasion (model: opus)
+│   │   │                           # + executable: ad-recon-hunter, ad-kerberos-hunter, llm-redteam-hunter, mobile-android-hunter
+│   │   ├── incident-response/
+│   │   │   └── SKILL.md            # DFIR reference: NIST/PICERL lifecycle, evidence handling, ATT&CK (model: opus)
+│   │   │                           # + executable: memory-forensics-hunter, disk-triage-hunter, log-timeline-hunter
+│   │   ├── redteam-ops/
+│   │   │   └── SKILL.md            # Red-team-ops reference: PTES, ROE, proof-for-clients, kill-chain (model: opus)
+│   │   │                           # + executable: network-pentest, host-privesc, cracking, reverse-engineering,
+│   │   │                           #   exploit-validation, social-engineering, wireless (hunters)
+│   │   ├── visual-explainer/        # HTML visualization skill (visual-explainer)
+│   │   │   ├── SKILL.md            # Workflow, diagram types, anti-slop rules (model: sonnet)
+│   │   │   ├── references/          # CSS patterns, libraries, slide patterns (~120KB)
+│   │   │   ├── templates/           # HTML reference templates (architecture, table, mermaid, slides)
+│   │   │   └── scripts/share.sh    # Vercel deployment script
+│   │   ├── {ddd-context-mapping, distributed-sagas-and-workflows, ...}/
+│   │   │   └── SKILL.md            # 12 architecture & design skills (O'Reilly catalog)
+│   │   └── {defensive-security-foundations, zero-trust-architecture, ...}/
+│   │       └── SKILL.md            # 19 security knowledge skills (O'Reilly catalog)
 │   ├── LEARNINGS.md                  # Full retro learnings archive (on-demand, not always loaded)
 │   ├── QUICK_REFERENCE.md           # Tool cheat sheets — terraform, docker, kubectl, ansible (on-demand)
 │   ├── scripts/
 │   │   └── shannon-mcp-wrapper.sh  # OAuth token wrapper for Shannon MCP server
-│   └── settings.json                # Claude Code project settings + Shannon MCP config
+│   └── settings.json                # Claude Code project settings (permissions, hooks)
 ├── CLAUDE.md                        # Project-level AI instructions (~91 lines, token-optimized)
 └── docs/
     └── guides/
@@ -904,6 +1138,11 @@ CLAUDE.md (project root, ~91 lines)     ← Always loaded: SDLC workflow, sessio
 ```
 
 The `/retro` command writes **abbreviated** learnings to CLAUDE.md (max 2 recent blocks) and **full detail** to `.claude/LEARNINGS.md`. Older blocks are automatically rotated out of CLAUDE.md to keep the token budget lean.
+
+---
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=vakaobr/claude-code-ai-development-workflow&type=Date)](https://star-history.com/#vakaobr/claude-code-ai-development-workflow&Date)
 
 ---
 

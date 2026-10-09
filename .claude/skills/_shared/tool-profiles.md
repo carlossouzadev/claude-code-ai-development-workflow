@@ -1,0 +1,414 @@
+# Tool Profiles for Security Skills
+
+Every security skill's `allowed-tools` frontmatter field references
+one of these profiles. Centralizing profiles means we change the
+allowlist in one place if a tool is later deemed unsafe.
+
+## Profile: passive
+
+For reconnaissance, configuration review, and static analysis. No
+outbound probes to targets. No Bash at all - forces skills that
+"just want to curl one thing" to justify upgrading to `active`.
+
+```yaml
+allowed-tools: Read, Grep, Glob, WebFetch(domain:*.in-scope-domain.com)
+```
+
+## Profile: active
+
+For skills that produce test traffic against in-scope web apps and APIs.
+Bash is allowed but only for the listed tools. Any tool not on the list
+is blocked.
+
+```yaml
+allowed-tools: >
+  Read, Grep, Glob, Write(path:.claude/planning/**),
+  WebFetch,
+  Bash(curl:*), Bash(wget:*), Bash(httpx:*), Bash(ffuf:*),
+  Bash(gobuster:*), Bash(nuclei:*), Bash(jq:*), Bash(arjun:*),
+  Bash(gf:*), Bash(gau:*), Bash(waybackurls:*),
+  Bash(nmap:--script=safe*), Bash(nmap:-sV), Bash(nmap:-Pn),
+  Bash(dig:*), Bash(host:*), Bash(whois:*),
+  Bash(openssl:s_client*), Bash(openssl:x509*)
+```
+
+Explicitly forbidden in `active`:
+- `rm`, `mv`, `cp` outside planning/
+- `sqlmap` (too aggressive by default; upgrade to specialist skill
+  with explicit scope approval)
+- `metasploit`, `msfconsole`, `msfvenom`
+- `hydra`, `medusa`, `john`, `hashcat` (credential attacks off unless
+  scope says otherwise)
+- `nikto` (noisy, better options exist)
+- Anything with `-d` or `--dangerous` flags
+
+## Profile: cloud-readonly
+
+For AWS IAM audit, S3 review, cloud config skills. Restricts AWS CLI
+to read verbs only.
+
+```yaml
+allowed-tools: >
+  Read, Grep, Glob, Write(path:.claude/planning/**),
+  Bash(aws:iam get-*), Bash(aws:iam list-*),
+  Bash(aws:iam simulate-principal-policy*),
+  Bash(aws:s3api get-*), Bash(aws:s3api list-*),
+  Bash(aws:s3api head-*),
+  Bash(aws:ec2 describe-*),
+  Bash(aws:rds describe-*),
+  Bash(aws:lambda get-*), Bash(aws:lambda list-*),
+  Bash(aws:cloudtrail lookup-events),
+  Bash(aws:configservice describe-*),
+  Bash(aws:sts get-caller-identity),
+  Bash(jq:*), Bash(yq:*)
+```
+
+Explicitly forbidden:
+- Any `aws * create-*`, `update-*`, `delete-*`, `put-*`, `attach-*`,
+  `detach-*`, `assume-role`
+- `aws s3 cp`, `aws s3 sync` (no data movement)
+- `aws ec2 run-instances` / `terminate-instances`
+
+## Profile: cicd-readonly
+
+For GitLab CI/CD security review. Read-only access to pipeline config,
+no ability to trigger runs.
+
+```yaml
+allowed-tools: >
+  Read, Grep, Glob, Write(path:.claude/planning/**),
+  Bash(glab:repo*), Bash(glab:ci list*), Bash(glab:ci view*),
+  Bash(glab:ci trace*), Bash(glab:mr list*), Bash(glab:mr view*),
+  Bash(glab:issue list*), Bash(glab:issue view*),
+  Bash(git:log*), Bash(git:show*), Bash(git:blame*), Bash(git:grep*),
+  Bash(yq:*), Bash(jq:*)
+```
+
+Explicitly forbidden:
+- `glab ci run`, `glab ci retry`, `glab pipeline run`
+- `glab mr create`, `glab mr merge`
+- `git push`, `git commit`, `git reset`
+
+## Profile: repo-readonly
+
+For secrets-in-code hunting. History + grep only, no index changes.
+
+```yaml
+allowed-tools: >
+  Read, Grep, Glob, Write(path:.claude/planning/**),
+  Bash(git:log*), Bash(git:show*), Bash(git:blame*), Bash(git:grep*),
+  Bash(git:diff*), Bash(git:cat-file*), Bash(git:ls-files*),
+  Bash(trufflehog:*), Bash(gitleaks:detect*), Bash(gitleaks:protect*)
+```
+
+## Profile: recon-webcheck
+
+For the `web-check-recon` skill, which runs a **self-hosted**
+`lissy93/web-check` container on demand and reads its local JSON API. It
+is the `active` recon profile narrowed to this skill's needs, extended
+with on-demand container lifecycle. The only outbound prober is web-check
+itself (constrained by the scope gate); `curl` is restricted by the
+skill's methodology to the local API (`127.0.0.1:3000`), never to targets.
+
+```yaml
+allowed-tools: >
+  Read, Grep, Glob, Write(path:.claude/planning/**),
+  WebFetch,
+  Bash(docker:compose*), Bash(docker:ps*), Bash(docker:inspect*),
+  Bash(docker:logs*),
+  Bash(bash:*), Bash(python3:*),
+  Bash(curl:*), Bash(jq:*)
+```
+
+Explicitly forbidden:
+- Pointing web-check at the public `web-check.xyz` instance for any client
+  target (discloses the target to a third party; probes from an
+  uncontrolled IP).
+- Binding the container to anything other than `127.0.0.1`.
+- Running the ACTIVE-tier checks (`ports`, `trace-route`, `firewall`,
+  `linked-pages`, `quality`, `screenshot`) when the asset's
+  `testing_level` is not `active`.
+- Running `tls-labs` (public Qualys scan) without explicit scope approval.
+
+## Profile: internal-ad
+
+For **authorized internal penetration tests** of Active Directory /
+internal networks. This profile DELIBERATELY breaks the no-credential-
+attacks rule that `active` enforces - it permits credential validation,
+password spray, Kerberos roasting, and credential dumping. It is
+therefore the highest-blast-radius profile in the library and carries
+extra gating (see below).
+
+```yaml
+allowed-tools: >
+  Read, Grep, Glob, Write(path:.claude/planning/**),
+  Bash(nmap:*), Bash(netexec:*), Bash(nxc:*), Bash(crackmapexec:*),
+  Bash(kerbrute:*), Bash(ldapsearch:*), Bash(rpcclient:*),
+  Bash(smbclient:*), Bash(showmount:*), Bash(snmp-check:*),
+  Bash(bloodhound-python:*), Bash(certipy:*),
+  Bash(GetUserSPNs.py:*), Bash(GetNPUsers.py:*), Bash(getTGT.py:*),
+  Bash(secretsdump.py:*), Bash(impacket-*:*),
+  Bash(hashcat:*), Bash(john:*),
+  Bash(jq:*), Bash(dig:*), Bash(host:*)
+```
+
+Extra gating (enforced by every `internal-ad` skill in its Authorization
+Check, beyond the standard scope read):
+- The scope file MUST set `internal_pentest: approved` for the engagement.
+- Credentials MUST come from `ad_credentials_vault_path`; never hardcode.
+- Password spray MUST read the domain lockout policy FIRST and stay one
+  attempt under threshold per window.
+- Credential dumping (`secretsdump`, NTDS, LSASS) requires
+  `credential_dumping: approved` AND already-proven admin reach.
+- Domain-dominance actions (golden/silver ticket, DCSync as DA, forged
+  certs) require `domain_dominance: approved` and are documented for
+  cleanup. STOP at proof.
+
+Explicitly forbidden even here:
+- Any destructive action on production data (account deletion, GPO push
+  to live OUs, mass password reset).
+- Persistence implants left in place after the engagement.
+- Egress of dumped credential material outside the engagement vault.
+
+## Profile: ai-redteam
+
+For automated red-teaming of **the org's own** LLM / inference endpoints
+(prompt-injection, jailbreak, harmful-output probing). Targets must be
+in-scope endpoints, not third-party model providers.
+
+```yaml
+allowed-tools: >
+  Read, Grep, Glob, Write(path:.claude/planning/**),
+  WebFetch,
+  Bash(garak:*), Bash(python3:-m garak*), Bash(pyrit:*),
+  Bash(python3:*), Bash(pip:show*), Bash(curl:*), Bash(jq:*)
+```
+
+Explicitly forbidden:
+- Pointing probes at a closed-weight provider's public API as the
+  "target" (test YOUR endpoint, not OpenAI/Anthropic infra).
+- Storing any successfully-jailbroken harmful generations beyond the
+  minimal snippet needed as finding evidence.
+
+## Profile: mobile-sast
+
+For **static** Android APK assessment (MobSF static engine + secret
+scanners). Static-only by default; dynamic instrumentation (Frida,
+emulator) is out of profile and requires a human-approved upgrade.
+
+```yaml
+allowed-tools: >
+  Read, Grep, Glob, Write(path:.claude/planning/**),
+  Bash(mobsf:*), Bash(mobsfscan:*), Bash(apkleaks:*),
+  Bash(apktool:d*), Bash(jadx:*), Bash(unzip:*),
+  Bash(trufflehog:*), Bash(jq:*), Bash(python3:*)
+```
+
+Explicitly forbidden:
+- Uploading client APKs to the MobSF **public/hosted** instance - run a
+  local MobSF only (the APK is client IP).
+- Frida / dynamic hooking / live-device instrumentation without a
+  scope-approved upgrade to a dynamic profile.
+
+## Profile: dfir-readonly
+
+For **digital forensics / incident response** analysis of acquired
+evidence. The defining constraint is **evidence integrity**: all tools
+operate **read-only on verified COPIES** of evidence (write-blocked
+images, hash-verified). No acquisition, no live-system mutation, no
+remounting read-write.
+
+```yaml
+allowed-tools: >
+  Read, Grep, Glob, Write(path:.claude/planning/**),
+  Bash(vol:*), Bash(vol.py:*), Bash(volatility3:*),
+  Bash(mmls:*), Bash(fls:*), Bash(icat:*), Bash(fsstat:*),
+  Bash(istat:*), Bash(blkls:*), Bash(tsk_recover:*), Bash(mactime:*),
+  Bash(log2timeline.py:*), Bash(psort.py:*), Bash(pinfo.py:*),
+  Bash(chainsaw:*), Bash(hayabusa:*), Bash(evtx_dump:*),
+  Bash(yara:*), Bash(tshark:*), Bash(zeek:*), Bash(capinfos:*),
+  Bash(strings:*), Bash(file:*), Bash(exiftool:*), Bash(binwalk:*),
+  Bash(bulk_extractor:*), Bash(regripper:*),
+  Bash(sha256sum:*), Bash(md5sum:*), Bash(jq:*)
+```
+
+Extra gating (enforced by every `dfir-readonly` skill in its
+Authorization Check):
+- The scope file MUST set `dfir_scope.incident_response: approved`.
+- Evidence is referenced from `dfir_scope.evidence_store_path` by
+  `case_id`; the skill computes/verifies SHA-256 BEFORE analysis and
+  records it. If the hash does not match the acquisition record, HALT.
+- Live-response against a running production host requires
+  `dfir_scope.allow_live_response: approved` (default denied - work on
+  acquired images, not live systems).
+- Every command run and every artifact extracted is logged to the case
+  folder for chain-of-custody / reproducibility.
+
+Explicitly forbidden:
+- Any write/mount-rw/acquisition verb against original evidence
+  (`dd if=…of=original`, `mount` without `ro`, `tsk_recover` onto the
+  source, registry hive writes).
+- Containment/eradication actions (kill, isolate, disable account) - those
+  are operator-driven, change-controlled, and out of profile.
+- Uploading evidence or extracted samples to third-party / public
+  sandboxes without explicit `dfir_scope.external_sandbox: approved`
+  (evidence may contain regulated data).
+
+## Profile: network-pentest
+
+For **authorized network / infrastructure penetration testing** of
+non-web services (external or internal). Active discovery + enumeration +
+least-damage exploit validation. More aggressive than `active` (full
+nmap, service enum), but NOT online brute force (`hydra`/`medusa` stay
+banned) and NOT destructive.
+
+```yaml
+allowed-tools: >
+  Read, Grep, Glob, Write(path:.claude/planning/**),
+  Bash(nmap:*), Bash(rustscan:*), Bash(masscan:*),
+  Bash(netexec:*), Bash(nxc:*), Bash(enum4linux-ng:*), Bash(enum4linux:*),
+  Bash(smbmap:*), Bash(smbclient:*), Bash(rpcclient:*), Bash(showmount:*),
+  Bash(snmpwalk:*), Bash(snmp-check:*), Bash(onesixtyone:*),
+  Bash(dig:*), Bash(host:*), Bash(whois:*), Bash(nbtscan:*),
+  Bash(searchsploit:*), Bash(ssh-audit:*),
+  Bash(openssl:s_client*), Bash(openssl:x509*),
+  Bash(curl:*), Bash(jq:*)
+```
+
+Extra gating: scope MUST set `red_team_ops.network_pentest: approved`;
+exclude `out_of_scope` hosts from ranges; respect ROE scan window/rate;
+exploit validation only with `red_team_ops.exploit_validation: approved`
+and benign proof only.
+
+Explicitly forbidden: online brute force (`hydra`/`medusa`), DoS/stress
+options, destructive exploits.
+
+## Profile: host-privesc
+
+For **local privilege-escalation assessment** on an authorized host where
+a foothold already exists. Enumeration + interpretation + least-damage
+validation; no persistence.
+
+```yaml
+allowed-tools: >
+  Read, Grep, Glob, Write(path:.claude/planning/**),
+  Bash(linpeas:*), Bash(linpeas.sh:*), Bash(LinEnum:*), Bash(LinEnum.sh:*),
+  Bash(pspy:*), Bash(pspy64:*), Bash(linux-exploit-suggester:*), Bash(les.sh:*),
+  Bash(winpeas:*), Bash(seatbelt:*), Bash(powerup:*),
+  Bash(sudo:-l), Bash(id:*), Bash(whoami:*), Bash(getcap:*),
+  Bash(uname:*), Bash(crontab:-l), Bash(systemctl:*),
+  Bash(find:*), Bash(ls:*), Bash(cat:*), Bash(grep:*), Bash(jq:*)
+```
+
+Extra gating: scope MUST set `red_team_ops.host_privesc: approved`; the
+foothold must have been obtained under prior authorization. Prove with
+`id`/`whoami` and STOP; revert any state change; no persistence; avoid
+kernel exploits on production unless explicitly approved.
+
+## Profile: cracking
+
+For **offline** password / hash cracking of material captured by other
+skills. Offline only - never online brute force.
+
+```yaml
+allowed-tools: >
+  Read, Grep, Glob, Write(path:.claude/planning/**),
+  Bash(hashcat:*), Bash(john:*), Bash(hashid:*), Bash(hash-identifier:*),
+  Bash(cewl:*), Bash(crunch:*), Bash(jq:*),
+  Bash(sha256sum:*), Bash(md5sum:*)
+```
+
+Extra gating: scope MUST set `red_team_ops.offline_cracking: approved`
+(or the AD chain's `red_team_extension.offline_cracking`). Hashes/
+plaintext stay in the engagement vault; report counts + redacted samples
+only; no upload to third-party/online cracking services. Like
+`internal-ad`, this profile is exempt from the validator's `hashcat` ban
+(offline cracking is its purpose); `sqlmap`/`metasploit`/`hydra`/`nikto`
+remain banned.
+
+## Profile: reverse-eng
+
+For static + light-dynamic reverse engineering of authorized artifacts.
+Dynamic execution happens ONLY in an isolated sandbox (skill-enforced).
+
+```yaml
+allowed-tools: >
+  Read, Grep, Glob, Write(path:.claude/planning/**),
+  Bash(file:*), Bash(strings:*), Bash(binwalk:*), Bash(floss:*),
+  Bash(capa:*), Bash(yara:*), Bash(nm:*), Bash(objdump:*),
+  Bash(readelf:*), Bash(rabin2:*), Bash(r2:*), Bash(rizin:*),
+  Bash(ghidra:*), Bash(analyzeHeadless:*),
+  Bash(gdb:*), Bash(ltrace:*), Bash(strace:*),
+  Bash(sha256sum:*), Bash(md5sum:*), Bash(jq:*), Bash(python3:*)
+```
+
+Extra gating: scope MUST set `red_team_ops.reverse_engineering: approved`;
+record artifact SHA-256; any execution (gdb/ltrace/strace/running the
+sample) only in a disposable, network-isolated sandbox.
+
+## Profile: exploit-validation
+
+For confirming exploitability with vetted PoCs / controlled local
+exploit dev. `service_affecting` - replica-first, benign proof, stop at
+proof.
+
+```yaml
+allowed-tools: >
+  Read, Grep, Glob, Write(path:.claude/planning/**),
+  Bash(searchsploit:*), Bash(python3:*), Bash(gdb:*),
+  Bash(ropper:*), Bash(one_gadget:*), Bash(checksec:*),
+  Bash(nc:*), Bash(ncat:*), Bash(socat:*), Bash(curl:*),
+  Bash(sha256sum:*), Bash(jq:*)
+```
+
+Extra gating: scope MUST set `red_team_ops.exploit_validation: approved`;
+per-invocation confirmation for live targets; prefer `red_team_ops.lab_replica`.
+Explicitly forbidden: `metasploit`/`msfvenom`, destructive/DoS payloads,
+persistence/weaponization beyond proof. (sqlmap/hydra/nikto stay banned.)
+
+## Profile: social-eng
+
+For authorized phishing / awareness campaigns. Targets people - requires
+separate written consent + an approved recipient list.
+
+```yaml
+allowed-tools: >
+  Read, Grep, Glob, Write(path:.claude/planning/**),
+  Bash(gophish:*), Bash(evilginx:*), Bash(evilginx2:*),
+  Bash(python3:*), Bash(curl:*), Bash(dig:*), Bash(host:*),
+  Bash(openssl:s_client*), Bash(openssl:x509*), Bash(jq:*)
+```
+
+Extra gating: scope MUST set `red_team_ops.social_engineering: approved`,
+`se_consent_ref`, and `se_recipient_list`; evilginx requires
+`red_team_ops.se_evilginx: approved`. NEVER store real plaintext
+credentials (submission-fact only); send only to the consented list.
+
+## Profile: wireless
+
+For 802.11 assessment / awareness demos from a **Linux capture host**
+(VM with USB passthrough, or a Raspberry Pi). `service_affecting` (deauth/
+evil-twin disrupt RF). Requires monitor-mode hardware; cannot run on macOS.
+
+```yaml
+allowed-tools: >
+  Read, Grep, Glob, Write(path:.claude/planning/**),
+  Bash(iw:*), Bash(iwconfig:*), Bash(airmon-ng:*), Bash(airodump-ng:*),
+  Bash(aireplay-ng:*), Bash(aircrack-ng:*), Bash(kismet:*),
+  Bash(hcxdumptool:*), Bash(hcxpcapngtool:*), Bash(wifite:*),
+  Bash(hostapd:*), Bash(hostapd-mana:*), Bash(dnsmasq:*), Bash(bettercap:*),
+  Bash(tshark:*), Bash(tcpdump:*), Bash(capinfos:*),
+  Bash(sha256sum:*), Bash(jq:*)
+```
+
+Extra gating: scope MUST set `red_team_ops.wireless: approved` and list
+`wireless_targets`; rogue-AP / attendee capture requires
+`red_team_ops.wireless_workshop_consent` + attendee signage; deauth limited
+to in-scope targets; WPA cracking is handed to `cracking-hunter` (offline).
+
+## Per-Skill Override
+
+A skill may request a more restrictive subset of its profile by listing
+a narrower `allowed-tools` in its own frontmatter. A skill may NEVER
+request a broader set than its profile without explicit approval in a
+commit message from a human reviewer.

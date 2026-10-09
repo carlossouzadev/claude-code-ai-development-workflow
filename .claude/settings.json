@@ -1,33 +1,42 @@
 {
   "permissions": {
     "allow": [
-      "Read",
-      "Edit",
+      "Agent",
+      "Bash(./shannon/*)",
+      "Bash(aws sts get-caller-identity*)",
+      "Bash(aws pricing get-products*)",
+      "Bash(aws-doctor *)",
+      "Bash(az account show*)",
+      "Bash(cloud-cost-cli *)",
+      "Bash(gcloud auth list*)",
+      "Bash(gcloud config get-value*)",
+      "Bash(bundle audit*)",
+      "Bash(bundle exec rspec*)",
+      "Bash(cargo audit*)",
+      "Bash(cargo test*)",
+      "Bash(cat *)",
+      "Bash(docker *)",
+      "Bash(find *)",
+      "Bash(git *)",
+      "Bash(go mod*)",
+      "Bash(go test*)",
+      "Bash(govulncheck*)",
+      "Bash(ls *)",
+      "Bash(node *)",
       "Bash(npm run *)",
       "Bash(npx *)",
-      "Bash(git *)",
-      "Bash(cat *)",
-      "Bash(ls *)",
-      "Bash(find *)",
-      "Bash(docker *)",
-      "Bash(./shannon/*)",
-      "Bash(node *)",
-      "mcp__claude-context__search_code",
-      "mcp__claude-context__index_codebase",
+      "Bash(pip-audit*)",
+      "Bash(pytest*)",
+      "Bash(python -m pytest*)",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Read",
+      "Write",
+      "mcp__claude-context__clear_index",
       "mcp__claude-context__get_indexing_status",
-      "mcp__claude-context__clear_index"
+      "mcp__claude-context__index_codebase",
+      "mcp__claude-context__search_code"
     ]
-  },
-  "mcpServers": {
-    "shannon": {
-      "command": "bash",
-      "args": [
-        "${workspaceFolder}/.claude/scripts/shannon-mcp-wrapper.sh"
-      ],
-      "env": {
-        "SHANNON_DIR": "${workspaceFolder}/shannon",
-        "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000"
-      }
-    }
   }
 }

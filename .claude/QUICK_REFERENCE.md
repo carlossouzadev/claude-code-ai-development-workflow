@@ -37,7 +37,10 @@ ansible-inventory --graph                   # Show inventory tree
 ```bash
 cat .claude/planning/{issue-name}/00_STATUS.md   # Check workflow status
 
+/roadmap [description]               # Spec layer: sequence issues into project phases → ROADMAP.md
+/roadmap-run {phase-id}              # Loop layer: one bounded autonomous slice of a roadmap phase
 /discover [description]              # Phase 1: Scope + stack detection + repo map
+                                     #   + optional: --roadmap-phase {id} to attach to a roadmap phase
 /repo-map [path]                     # Generate compact repo structural overview (standalone)
 /research {issue-name}               # Phase 2: Codebase analysis
 /design-system {issue-name}          # Phase 3: Architecture + ADRs
@@ -51,6 +54,14 @@ cat .claude/planning/{issue-name}/00_STATUS.md   # Check workflow status
 /deploy-plan {issue-name}            # Phase 9: Deployment strategy
 /observe {issue-name}                # Phase 10: Observability
 /retro {issue-name}                  # Phase 11: Retrospective
+```
+
+## Integrations (MCP)
+```bash
+/retrieval/setup ; /retrieval search "..."   # Semantic code search (claude-context)
+/firecrawl/setup ; /firecrawl scrape <url>    # Web scraping (Firecrawl)
+/markitdown/setup ; /markitdown <file|url>    # PDF/DOCX/XLSX → Markdown (MarkItDown) — auto-runs in /discover + /research
+/n8n/setup ; /n8n <request>                   # Workflow automation (n8n)
 ```
 
 ## All Available Commands
