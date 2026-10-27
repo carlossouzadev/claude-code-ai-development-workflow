@@ -288,6 +288,18 @@ Full inventory with per-skill source book: [`.claude/skills/SECURITY_KNOWLEDGE_S
 
 ---
 
+## Dependency CVE Gate
+
+`/sdlc` runs a Dependency CVE Gate between Implement and Review, backed by the `dependency-cve-remediation` skill (`.claude/skills/dependency-cve-remediation/`). It scans the whole repo's dependencies, then fixes every Critical, High and CISA KEV finding in a loop: bumps the version with the package manager, maps removed or renamed APIs from the release notes on major upgrades, guards untested call sites with characterization tests, and reruns build, lint and tests against a recorded baseline. Output is `docs/{issue}/CVE_REMEDIATION.md` with a PASS, RESIDUAL or BLOCKED verdict; BLOCKED (a Critical or KEV item left) stops the pipeline for a human decision.
+
+Detection is local with [trivy](https://trivy.dev). Only public advisory IDs (CVE, GHSA, OSV) are sent to [cve.now](https://cve.now) for KEV, EPSS, exploit and fixed-version data; lockfiles and package lists never leave the machine. Run it on its own with:
+
+```bash
+python3 -I .claude/skills/dependency-cve-remediation/scripts/cve_scan.py --path . --base origin/main
+```
+
+Jump straight to the gate with `/sdlc <issue> --cve`.
+
 ## Agent Library
 
 Agents live under `.claude/agents/` and split into two roles — **orchestrators** (drive a phase end-to-end) and **specialists** (focused domain experts dispatched by an orchestrator or invoked directly). The `/review` phase (Phase 6) dispatches five specialists in parallel, aggregates their verdicts, and runs a scoped fix loop (max 3 iterations — only failing specialists re-review). The `/security` phase (Phase 7a) delegates to `security-orchestrator` for large scopes, which composes the 40 defensive skills.
@@ -296,7 +308,7 @@ Agents live under `.claude/agents/` and split into two roles — **orchestrators
 
 | Agent | Role |
 |---|---|
-| `sdlc-orchestrator` | Autonomous SDLC driver — Research → Plan → Implement → Review, with parallel specialist dispatch and JSON state machine |
+| `sdlc-orchestrator` | Autonomous SDLC driver: Research → Plan → Implement → CVE Gate → Review, with parallel specialist dispatch and JSON state machine |
 | `security-orchestrator` | Composes 40 defensive skills based on asset type, scope risk, and detected stack |
 
 **Specialists:**

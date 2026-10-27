@@ -4,12 +4,12 @@ Quick reference for the SDLC workflow.
 
 ## `/sdlc <issue-name> [description] [flags]`
 
-Execute complete SDLC: Research → Plan → Implement → Review
+Execute complete SDLC: Research → Plan → Implement → CVE Gate → Review
 
 ### Syntax
 
 ```bash
-/sdlc <issue-name> [description] [--resume | --plan | --implement | --review]
+/sdlc <issue-name> [description] [--resume | --plan | --implement | --cve | --review]
 ```
 
 ### Arguments
@@ -21,7 +21,8 @@ Execute complete SDLC: Research → Plan → Implement → Review
 | `--resume` | No | Continue from STATUS.md |
 | `--plan` | No | Start from Planning (needs RESEARCH.md) |
 | `--implement` | No | Start from Implementation (needs PLAN.md) |
-| `--review` | No | Start from Review (needs IMPLEMENTATION.md) |
+| `--cve` | No | Start from the Dependency CVE Gate (needs IMPLEMENTATION.md) |
+| `--review` | No | Start from Review (needs IMPLEMENTATION.md; runs the CVE Gate first if CVE_REMEDIATION.md is missing) |
 
 *Required for new workflows
 
