@@ -1,6 +1,6 @@
 ---
 name: sdlc
-description: Execute complete SDLC: Research → Plan → Implement → Review. Autonomous, single command for full feature development.
+description: Execute complete SDLC: Research → Plan → Implement → CVE Gate → Review. Autonomous, single command for full feature development.
 model: sonnet
 ---
 
@@ -13,7 +13,7 @@ Parse user input and invoke the SDLC Orchestrator Agent. **Contain NO workflow l
 ## Command Syntax
 
 ```
-/sdlc <issue-name> [description] [--resume | --plan | --implement | --review]
+/sdlc <issue-name> [description] [--resume | --plan | --implement | --cve | --review]
 ```
 
 ## Arguments
@@ -26,7 +26,8 @@ Parse user input and invoke the SDLC Orchestrator Agent. **Contain NO workflow l
 - `--resume`: Continue from where STATUS.md left off
 - `--plan`: Start from Planning phase (requires RESEARCH.md)
 - `--implement`: Start from Implementation (requires PLAN.md)
-- `--review`: Start from Review (requires IMPLEMENTATION.md)
+- `--cve`: Start from the Dependency CVE Gate (requires IMPLEMENTATION.md)
+- `--review`: Start from Review (requires IMPLEMENTATION.md; runs the CVE Gate first if CVE_REMEDIATION.md is missing)
 
 ## Input Validation
 
@@ -56,7 +57,7 @@ INVOKE AGENT: .claude/agents/sdlc-orchestrator.md
 PARAMETERS:
 - issue_name: <parsed issue-name>
 - description: <parsed description>
-- entry_point: <default|resume|plan|implement|review>
+- entry_point: <default|resume|plan|implement|cve|review>
 ```
 
 ## Examples

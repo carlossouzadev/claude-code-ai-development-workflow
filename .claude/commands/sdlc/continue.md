@@ -62,6 +62,7 @@ Parse the Progress section of the selected `00_STATUS.md` (or `STATUS.md`). The 
 | `Design` | Design | `/design-system {issue-name}` |
 | `Planning` | Planning | `/plan {issue-name}` |
 | `Implementation` | Implementation | `/implement {issue-name}` |
+| `CVE Gate` | Dependency CVE Gate | `/sdlc {issue-name} --cve` |
 | `Review` | Review | `/review {issue-name}` |
 | `Security` | Security | `/security {issue-name}` |
 | `Deploy` | Deploy | `/deploy-plan {issue-name}` |

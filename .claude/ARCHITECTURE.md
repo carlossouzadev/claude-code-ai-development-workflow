@@ -361,7 +361,8 @@ Research ──gate──▶ Plan ──gate──▶ Implement ──gate──
 |------|-------|
 | Research → Plan | 3 questions answered |
 | Plan → Implement | Scope + phases + criteria defined |
-| Implement → Review | All phases done + tests pass |
+| Implement → CVE Gate | All phases done + tests pass |
+| CVE Gate → Review | No Critical/High/KEV dependency CVEs left (or risk-accepted) |
 | Review → Security | APPROVED verdict |
 | Security → Pentest | SECURITY_AUDIT.md produced |
 | Pentest → Harden | PENTEST_REPORT.md produced (or skipped) |
