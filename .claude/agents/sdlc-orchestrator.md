@@ -1,6 +1,6 @@
 ---
 name: sdlc-orchestrator
-description: Autonomous SDLC orchestrator. Research → Architecture → Plan → Implement → Parallel Expert Review → Documentation → Production Ready. Use for complete feature development.
+description: Autonomous SDLC orchestrator. Research → Architecture → Plan → Implement → CVE Gate → Parallel Expert Review → Documentation → Production Ready. Use for complete feature development.
 model: claude-opus-4-6
 tools:
   - Read
@@ -23,10 +23,10 @@ Execute the complete software development lifecycle autonomously, producing prod
 ## Workflow
 
 ```
-Research → Architecture → Plan → Implement → Parallel Expert Review → Documentation → Complete
-                                                      ↓
-                                              Scoped Fix Loop (max 3)
-                                              (only failing experts re-review)
+Research → Architecture → Plan → Implement → CVE Gate → Parallel Expert Review → Documentation → Complete
+                                                 ↓                 ↓
+                                     Dependency fix loop    Scoped Fix Loop (max 3)
+                                     (max 3 per package)    (only failing experts re-review)
 ```
 
 ## Core Rules
@@ -69,6 +69,7 @@ Create `docs/{issue_name}/` directory and write `docs/{issue_name}/STATE.json`:
   "phase_status": "pending",
   "review_iteration": 0,
   "failing_experts": [],
+  "cve_verdict": "pending",
   "created_at": "{ISO-8601}",
   "updated_at": "{ISO-8601}",
   "artifacts": {
@@ -76,6 +77,7 @@ Create `docs/{issue_name}/` directory and write `docs/{issue_name}/STATE.json`:
     "ADR.md": "pending",
     "PLAN.md": "pending",
     "IMPLEMENTATION.md": "pending",
+    "CVE_REMEDIATION.md": "pending",
     "SECURITY.md": "pending",
     "QA.md": "pending",
     "SRE.md": "pending",
@@ -240,8 +242,48 @@ Agent(
 
 **After complete:**
 1. Read `docs/{issue_name}/IMPLEMENTATION.md` — verify "Phases Completed" and "Test Results" with actual output
-2. Update STATE.json: `current_phase: "review"`, `IMPLEMENTATION.md: "complete"`
-3. Notify: `✅ Implementation Complete → Parallel Expert Review`
+2. Update STATE.json: `current_phase: "cve_gate"`, `IMPLEMENTATION.md: "complete"`
+3. Notify: `✅ Implementation Complete → CVE Gate`
+
+---
+
+## Phase 4b — Dependency CVE Gate
+
+Checks the whole repo's dependencies (new and existing) for known CVEs and fixes them without changing behaviour. Detection is local (trivy); only public advisory IDs go to cve.now for KEV/EPSS/fix data. Never send lockfiles or package lists to an external service.
+
+**Spawn Agent:**
+```
+Agent(
+  prompt: "
+    Execute the Dependency CVE Gate for SDLC issue: {issue_name}
+
+    Follow ALL instructions in ~/.claude/skills/dependency-cve-remediation/SKILL.md
+
+    Required reading:
+    - docs/{issue_name}/IMPLEMENTATION.md (which dependencies this change added or bumped)
+    - docs/{issue_name}/PLAN.md (validation commands)
+
+    Create:
+    - docs/{issue_name}/CVE_REMEDIATION.md
+    - docs/{issue_name}/cve-scan.json
+    - Update docs/{issue_name}/STATUS.md
+
+    Scope: fix every Critical, High and CISA KEV finding, introduced or pre-existing.
+    For major upgrades, map removed or renamed APIs from the release notes before changing code,
+    and guard untested call sites with characterization tests first.
+    Show actual command output for the baseline and final validation. Do not weaken tests.
+
+    Produce a clear PASS, RESIDUAL or BLOCKED verdict.
+  "
+)
+```
+
+**After complete:**
+1. Read `docs/{issue_name}/CVE_REMEDIATION.md`. Verify the final scan and validation output are present, and the verdict matches the Residual table.
+2. Update STATE.json: `CVE_REMEDIATION.md: "complete"`, `cve_verdict: "{pass|residual|blocked}"`
+3. By verdict:
+   - **PASS / RESIDUAL:** `current_phase: "review"`. Notify: `✅ CVE Gate {PASS|RESIDUAL}: {N} packages fixed, {M} residual → Parallel Expert Review`
+   - **BLOCKED** (a Critical or KEV item is left): `current_phase: "blocked"`. Show the Residual table and ask the user to choose: accept the risk (then record it in CVE_REMEDIATION.md, set `cve_verdict: "residual"` and continue), approve a replacement package (re-run this phase), or fix it by hand and `--resume`.
 
 ---
 
@@ -258,6 +300,8 @@ Agent(  ← Security reviewer
 
     Required reading:
     - docs/{issue_name}/IMPLEMENTATION.md
+    - docs/{issue_name}/CVE_REMEDIATION.md (dependency CVEs are already scanned and fixed;
+      assess the Residual items and the API changes made for upgrades, don't re-scan from scratch)
     - Run: git diff HEAD --name-only (then read changed files)
 
     Create: docs/{issue_name}/SECURITY.md
@@ -371,6 +415,9 @@ Agent(
     Fix ONLY the blocking issues listed.
     Do NOT fix non-blocking suggestions.
     Run all tests after fixing — show actual output.
+    If you changed any dependency manifest or lockfile, rerun
+    ~/.claude/skills/dependency-cve-remediation/scripts/cve_scan.py and append the result
+    to docs/{issue_name}/CVE_REMEDIATION.md; a new Critical/High/KEV finding is a blocking issue.
     Update REVIEW.md: strikethrough fixed items, add fix output.
     Append a 'Fix Iteration {N}' section to docs/{issue_name}/IMPLEMENTATION.md
     listing any additional files modified during this fix and why.
@@ -461,6 +508,13 @@ Read all expert artifacts and write `docs/{issue_name}/PRODUCTION_READINESS.md`:
 - [x/·] QA: {APPROVED / NEEDS_FIX} (QA.md)
 - [x/·] SRE: {APPROVED / NEEDS_FIX} (SRE.md)
 
+## Dependency CVEs
+
+- [x/·] CVE Gate: {PASS | RESIDUAL | BLOCKED} (CVE_REMEDIATION.md): {N} packages fixed, {M} residual
+- {each residual item: package, severity, deadline, mitigation or accepted-risk note}
+
+A residual Critical or KEV item without a recorded risk acceptance makes the Final Verdict BLOCKED.
+
 ## Code Quality
 
 - [x] All tests pass
@@ -506,7 +560,8 @@ Append to `.claude/sdlc/RETROSPECTIVES.md`:
 ```markdown
 ## {issue_name} — {date}
 
-**Phases:** Research ✓, Architecture ✓, Planning ✓, Implementation ✓, Review ✓, Docs ✓
+**Phases:** Research ✓, Architecture ✓, Planning ✓, Implementation ✓, CVE Gate ✓, Review ✓, Docs ✓
+**CVE Gate:** {verdict}, {N} fixed, {M} residual
 **Fix iterations:** {N}/3
 **Blocked:** {yes — {reason} | no}
 **Expert failures:** {which experts flagged issues, if any}
@@ -529,10 +584,14 @@ Run `git diff --stat HEAD` and present:
 🎉 Production Ready: {issue_name}
 
 Expert Sign-offs: Security ✓, QA ✓, SRE ✓
+CVE Gate: {verdict}, {N} packages fixed, {M} residual
 Fix iterations: {N}/3
 {git diff --stat output}
 
-Suggested commit:
+Suggested commits:
+{one per fixed package or unit, from CVE_REMEDIATION.md, before the feature commit:}
+fix(deps): bump {pkg} {from} to {to} for {advisory} (+{n} more)
+
 feat({issue_name}): {one-line description}
 
 - {key change 1}
@@ -558,10 +617,11 @@ Deploy checklist:
 {
   "schema_version": "2.0.0",
   "issue_name": "{issue_name}",
-  "current_phase": "research|architecture|planning|implementation|review|fix|documentation|complete|blocked",
+  "current_phase": "research|architecture|planning|implementation|cve_gate|review|fix|documentation|complete|blocked",
   "phase_status": "pending|in_progress|complete|failed",
   "review_iteration": 0,
   "failing_experts": [],
+  "cve_verdict": "pending|pass|residual|blocked",
   "created_at": "{ISO-8601}",
   "updated_at": "{ISO-8601}",
   "artifacts": {
@@ -569,6 +629,7 @@ Deploy checklist:
     "ADR.md": "pending|complete",
     "PLAN.md": "pending|complete",
     "IMPLEMENTATION.md": "pending|complete",
+    "CVE_REMEDIATION.md": "pending|complete",
     "SECURITY.md": "pending|complete",
     "QA.md": "pending|complete",
     "SRE.md": "pending|complete",
@@ -593,13 +654,16 @@ Read STATE.json. Map `current_phase`:
 | `architecture` | Spawn Architecture Agent |
 | `planning` | Spawn Planning Agent |
 | `implementation` | Spawn Implementation Agent |
+| `cve_gate` | Spawn CVE Gate Agent (it rescans, so partial earlier runs are safe) |
 | `review` | Spawn all three review agents (parallel) |
 | `fix` | Read `failing_experts`, continue fix loop |
 | `documentation` | Spawn Tech Writer Agent |
 | `complete` | Report already complete |
-| `blocked` | Report blocked, show remaining issues |
+| `blocked` | Report blocked, show remaining issues. If `cve_verdict` is `blocked`, show the CVE Residual table and the three choices from Phase 4b |
 
 **Fallback:** If STATE.json missing, read STATUS.md `[x]` checkboxes to infer phase.
+
+**Entry points from `/sdlc`:** `cve` spawns the CVE Gate Agent (requires IMPLEMENTATION.md). `review` runs the CVE Gate first when `docs/{issue_name}/CVE_REMEDIATION.md` is missing, then the parallel review.
 
 ---
 
@@ -652,6 +716,7 @@ Workflow is PRODUCTION_READY only when:
 - [x] ADR.md — architectural decisions recorded
 - [x] PLAN.md — implementation plan with validation checkpoints
 - [x] IMPLEMENTATION.md — all phases complete, actual test output present
+- [x] CVE_REMEDIATION.md: PASS, or RESIDUAL with every Critical/KEV item risk-accepted
 - [x] SECURITY.md — APPROVED
 - [x] QA.md — APPROVED
 - [x] SRE.md — APPROVED
@@ -671,3 +736,4 @@ Workflow is PRODUCTION_READY only when:
 - Don't read STATUS.md for machine state — use STATE.json
 - Don't skip the Documentation phase — it's part of production readiness
 - Don't mark PRODUCTION_READY without all expert sign-offs
+- Don't skip the CVE Gate, and don't send lockfiles or package lists to cve.now or any other external service (advisory IDs only)

@@ -52,7 +52,10 @@ explain exactly why it is not exploitable in this context.
 2. Apply STRIDE threat model: Spoofing, Tampering, Repudiation, Information
    Disclosure, Denial of Service, Elevation of Privilege.
 3. Run OWASP Top 10 checklist against the codebase.
-4. Scan `package.json` / `requirements.txt` / `composer.json` for known CVEs.
+4. Dependency CVEs: if `docs/{issue_name}/CVE_REMEDIATION.md` exists (SDLC CVE Gate), review its
+   Residual items and the API changes made for upgrades instead of re-scanning. Otherwise run
+   `python3 -I ~/.claude/skills/dependency-cve-remediation/scripts/cve_scan.py --path .`
+   (local detection, only advisory IDs go to cve.now; never upload lockfiles or package lists).
 5. Check for secrets, hardcoded credentials, and insecure configurations.
 6. Output: `07a_SECURITY_AUDIT.md` - findings sorted by severity with CVSS scores.
 
